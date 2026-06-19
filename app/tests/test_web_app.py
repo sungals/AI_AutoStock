@@ -111,3 +111,46 @@ def test_base_path_prefixes_ui_links(fundamentals_db):
     body = login.data.decode('utf-8')
     assert '/ttakquant/static/app.css' in body
     assert 'action="/ttakquant/login"' in body
+
+
+def test_dashboard_renders_representative_market_panels(tmp_path):
+    dbp = str(tmp_path / 'q.db')
+    db_core.init_db(dbp)
+    import auth
+    with db_core.get_connection(dbp) as conn:
+        auth.create_user(conn, 'admin', 'secret')
+        conn.execute(
+            "INSERT INTO companies (corp_code, stock_code, corp_name, market) VALUES (?,?,?,?)",
+            ('C005930', '005930', '삼성전자', 'KOSPI'))
+        conn.execute(
+            "INSERT INTO companies (corp_code, stock_code, corp_name, market) VALUES (?,?,?,?)",
+            ('C247540', '247540', '에코프로비엠', 'KOSDAQ'))
+        conn.execute(
+            """INSERT INTO price_data
+               (stock_code, trade_date, close, market_cap)
+               VALUES ('005930', '2024-01-02', 70000, 1000000000)""")
+        conn.execute(
+            """INSERT INTO price_data
+               (stock_code, trade_date, close, market_cap)
+               VALUES ('005930', '2024-01-03', 72000, 1100000000)""")
+        conn.execute(
+            """INSERT INTO price_data
+               (stock_code, trade_date, close, market_cap)
+               VALUES ('247540', '2024-01-02', 100000, 2000000000)""")
+        conn.execute(
+            """INSERT INTO price_data
+               (stock_code, trade_date, close, market_cap)
+               VALUES ('247540', '2024-01-03', 98000, 1900000000)""")
+
+    app = web_app.create_app(db_path=dbp, testing=True, auth_required=True)
+    client = app.test_client()
+    client.post('/login', data={'username': 'admin', 'password': 'secret'})
+    res = client.get('/?market=ALL&sort=market')
+    body = res.data.decode('utf-8')
+
+    assert res.status_code == 200
+    assert '대표 종목 20' in body
+    assert 'KOSPI' in body
+    assert 'KOSDAQ' in body
+    assert '삼성전자' in body
+    assert '에코프로비엠' in body

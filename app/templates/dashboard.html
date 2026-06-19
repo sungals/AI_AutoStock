@@ -4,6 +4,26 @@
   <h1>대시보드</h1>
   <p>{{ user.username }}</p>
 </section>
+<form class="toolbar dashboard-toolbar" method="get" action="{{ app_path('/') }}">
+  <label>
+    시장
+    <select name="market">
+      {% for market in market_options %}
+      <option value="{{ market }}" {% if selected_market == market %}selected{% endif %}>{{ market }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    정렬
+    <select name="sort">
+      <option value="market" {% if selected_sort == 'market' %}selected{% endif %}>대표순</option>
+      <option value="fusion" {% if selected_sort == 'fusion' %}selected{% endif %}>융합 점수</option>
+      <option value="screening" {% if selected_sort == 'screening' %}selected{% endif %}>스크리닝 점수</option>
+      <option value="change" {% if selected_sort == 'change' %}selected{% endif %}>등락률</option>
+    </select>
+  </label>
+  <button type="submit">보기</button>
+</form>
 <section class="metric-grid">
   <a class="metric-tile accent-blue" href="{{ app_path('/screening') }}">
     <span>스크리닝</span><strong>{{ screening_count }}</strong><em>{{ screen_date or '-' }}</em>
@@ -80,6 +100,46 @@
         <strong>{{ row.stage }}</strong>
         <em>{{ row.status }}</em>
       </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel span-12">
+    <div class="panel-head">
+      <h2>대표 종목 20</h2>
+      <span class="panel-note">KOSPI 10 / KOSDAQ 10</span>
+    </div>
+    <div class="market-panels">
+      {% for market in ['KOSPI', 'KOSDAQ'] %}
+      {% if selected_market == 'ALL' or selected_market == market %}
+      <div class="market-panel">
+        <div class="market-panel-head">
+          <strong>{{ market }}</strong>
+          <span>{{ rep_rows.get(market, [])|length }}개</span>
+        </div>
+        <div class="rep-list">
+          {% for row in rep_rows.get(market, []) %}
+          <div class="rep-row">
+            <span class="rep-rank">{{ loop.index }}</span>
+            <strong>{{ row.corp_name }}</strong>
+            <em>{{ row.stock_code }}</em>
+            <span class="rep-close">{{ row.close if row.close is not none else '-' }}</span>
+            <span class="rep-change {% if row.change_pct is not none and row.change_pct >= 0 %}pos{% else %}neg{% endif %}">
+              {% if row.change_pct is not none %}
+                {{ "%+.2f"|format(row.change_pct) }}%
+              {% else %}
+                -
+              {% endif %}
+            </span>
+            <span class="rep-meta">{{ row.recommendation or row.screen_strategy or '-' }}</span>
+          </div>
+          {% endfor %}
+          {% if not rep_rows.get(market) %}
+          <p class="empty-state">대표 종목 데이터가 없습니다.</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
       {% endfor %}
     </div>
   </section>

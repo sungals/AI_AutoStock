@@ -11,8 +11,10 @@ from functools import wraps
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, stream_with_context, url_for
 
 import auth
+import dashboard_data
 import db_core
 import config
+import watchlist
 
 
 def _limit_arg(default: int = 50, cap: int = 200) -> int:
@@ -143,6 +145,12 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
     @app.get('/')
     @require_page_auth
     def dashboard():
+        selected_market = request.args.get('market', 'ALL').upper()
+        if selected_market not in watchlist.market_options():
+            selected_market = 'ALL'
+        selected_sort = request.args.get('sort', 'market').lower()
+        if selected_sort not in ('market', 'fusion', 'screening', 'change'):
+            selected_sort = 'market'
         with db_core.get_connection(app.config['DB_PATH']) as conn:
             screen_date = conn.execute(
                 "SELECT MAX(screen_date) AS d FROM screening_results").fetchone()['d']
@@ -176,6 +184,19 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
                    FROM macro_prices
                    WHERE trade_date=(SELECT MAX(trade_date) FROM macro_prices)
                    ORDER BY symbol""").fetchall()
+            rep_rows = {}
+            for market in ('KOSPI', 'KOSDAQ'):
+                if selected_market != 'ALL' and selected_market != market:
+                    continue
+                rows = dashboard_data.get_representative_overviews(
+                    conn, watchlist.REPRESENTATIVE_STOCKS.get(market, []))
+                if selected_sort == 'fusion':
+                    rows.sort(key=lambda r: (r['fusion_score'] is not None, r['fusion_score'] or -9999), reverse=True)
+                elif selected_sort == 'screening':
+                    rows.sort(key=lambda r: (r['screen_score'] is not None, r['screen_score'] or -9999), reverse=True)
+                elif selected_sort == 'change':
+                    rows.sort(key=lambda r: (r['change_pct'] is not None, r['change_pct'] or -9999), reverse=True)
+                rep_rows[market] = rows
         max_strategy = max([r['c'] for r in strategy_rows], default=1)
         strategy_counts = [
             {'strategy': r['strategy'], 'count': r['c'],
@@ -194,7 +215,10 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
             screening_count=screening_count, fusion_date=fusion_date,
             fusion_count=fusion_count, steps=_rowdicts(steps),
             strategy_counts=strategy_counts, fusion_top=fusion_top,
-            macro_rows=_rowdicts(macro_rows))
+            macro_rows=_rowdicts(macro_rows),
+            selected_market=selected_market, selected_sort=selected_sort,
+            market_options=watchlist.market_options(),
+            rep_rows=rep_rows)
 
     @app.get('/screening')
     @require_page_auth

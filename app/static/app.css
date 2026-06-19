@@ -31,6 +31,21 @@ button { cursor: pointer; background: #1f6feb; color: #ffffff; border-color: #1f
 h1 { font-size: 28px; margin: 0; }
 h2 { font-size: 18px; margin: 28px 0 12px; }
 p { color: #64748b; margin: 0; }
+.panel-note { color: #64748b; font-size: 13px; }
+.dashboard-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #dde2e8;
+  border-radius: 8px;
+}
+.dashboard-toolbar label {
+  min-width: 140px;
+}
 .metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .metric-tile {
   display: flex;
@@ -143,6 +158,51 @@ p { color: #64748b; margin: 0; }
 .macro-item strong { font-size: 16px; font-variant-numeric: tabular-nums; }
 .pos { color: #047857 !important; }
 .neg { color: #b42318 !important; }
+.market-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.market-panel {
+  padding: 12px;
+  border: 1px solid #eef1f5;
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+.market-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.market-panel-head strong { font-size: 16px; }
+.market-panel-head span { color: #64748b; font-size: 12px; }
+.rep-list { display: grid; gap: 8px; }
+.rep-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1.4fr) 74px 84px 76px minmax(80px, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+}
+.rep-rank {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #475569;
+  font-size: 12px;
+}
+.rep-row strong, .rep-close, .rep-change, .rep-meta, .rep-row em {
+  font-size: 13px;
+  font-style: normal;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+}
+.rep-row em { color: #64748b; }
+.rep-meta { color: #475569; text-align: right; }
 .step-row {
   display: grid;
   grid-template-columns: 14px 1fr 92px;
@@ -202,6 +262,9 @@ input {
   .metric-grid, .macro-grid { grid-template-columns: 1fr; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .span-5, .span-6, .span-7 { grid-column: span 1; }
+  .market-panels { grid-template-columns: 1fr; }
+  .rep-row { grid-template-columns: 24px minmax(0, 1fr) 62px 68px 58px; }
+  .rep-meta { grid-column: 2 / -1; text-align: left; }
   .bar-row { grid-template-columns: 92px minmax(80px, 1fr) 30px; }
   .rank-row { grid-template-columns: 24px 58px 78px minmax(64px, 1fr) 48px; }
   table { display: block; overflow-x: auto; }
