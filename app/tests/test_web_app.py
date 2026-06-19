@@ -91,3 +91,23 @@ def test_screening_page_renders_table(fundamentals_db):
     assert res.status_code == 200
     assert '<table' in body
     assert 'value' in body
+
+
+def test_base_path_prefixes_ui_links(fundamentals_db):
+    dbp, dates = fundamentals_db
+    import auth
+    with db_core.get_connection(dbp) as conn:
+        auth.create_user(conn, 'admin', 'secret')
+
+    app = web_app.create_app(
+        db_path=dbp, testing=True, auth_required=True, base_path='/ttakquant')
+    client = app.test_client()
+
+    res = client.get('/')
+    assert res.status_code == 302
+    assert res.headers['Location'].endswith('/ttakquant/login')
+
+    login = client.get('/login')
+    body = login.data.decode('utf-8')
+    assert '/ttakquant/static/app.css' in body
+    assert 'action="/ttakquant/login"' in body

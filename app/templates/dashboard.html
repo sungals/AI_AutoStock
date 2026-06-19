@@ -5,13 +5,13 @@
   <p>{{ user.username }}</p>
 </section>
 <section class="metric-grid">
-  <a class="metric-tile accent-blue" href="/screening">
+  <a class="metric-tile accent-blue" href="{{ app_path('/screening') }}">
     <span>스크리닝</span><strong>{{ screening_count }}</strong><em>{{ screen_date or '-' }}</em>
   </a>
-  <a class="metric-tile accent-green" href="/fusion">
+  <a class="metric-tile accent-green" href="{{ app_path('/fusion') }}">
     <span>융합 시그널</span><strong>{{ fusion_count }}</strong><em>{{ fusion_date or '-' }}</em>
   </a>
-  <a class="metric-tile accent-slate" href="/pipeline">
+  <a class="metric-tile accent-slate" href="{{ app_path('/pipeline') }}">
     <span>파이프라인</span><strong>{{ steps|length }}</strong><em>최근 로그</em>
   </a>
 </section>
@@ -20,11 +20,11 @@
   <section class="panel span-7">
     <div class="panel-head">
       <h2>전략별 선별 분포</h2>
-      <a href="/screening">전체 보기</a>
+      <a href="{{ app_path('/screening') }}">전체 보기</a>
     </div>
     <div class="bar-list">
       {% for row in strategy_counts %}
-      <a class="bar-row" href="/screening?strategy={{ row.strategy }}">
+      <a class="bar-row" href="{{ app_path('/screening') }}?strategy={{ row.strategy }}">
         <span class="bar-label">{{ row.strategy }}</span>
         <span class="bar-track"><span class="bar-fill" style="width: {{ row.width }}%"></span></span>
         <strong>{{ row.count }}</strong>
@@ -36,7 +36,7 @@
   <section class="panel span-5">
     <div class="panel-head">
       <h2>융합 랭킹</h2>
-      <a href="/fusion">상세</a>
+      <a href="{{ app_path('/fusion') }}">상세</a>
     </div>
     <div class="rank-list">
       {% for row in fusion_top %}
@@ -71,7 +71,7 @@
   <section class="panel span-6">
     <div class="panel-head">
       <h2>최근 파이프라인</h2>
-      <a href="/pipeline">로그</a>
+      <a href="{{ app_path('/pipeline') }}">로그</a>
     </div>
     <div class="step-list">
       {% for row in steps %}

@@ -4,7 +4,7 @@
   <h1>스크리닝</h1>
   <p>{{ screen_date or '-' }} / {{ strategy }}</p>
 </section>
-<form class="toolbar" method="get">
+<form class="toolbar" method="get" action="{{ app_path('/screening') }}">
   <select name="strategy">
     {% for name in ['all','value','turnaround','momentum','sector','trend','mean_revert','event','volatility','flow','quality_lowvol','guru'] %}
     <option value="{{ name }}" {% if strategy == name %}selected{% endif %}>{{ name }}</option>

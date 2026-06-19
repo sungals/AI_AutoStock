@@ -20,6 +20,7 @@ PRIOR_BUSINESS_YEAR = str(datetime.now().year - 2)  # 재작년
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, 'quant_data.db'))
 OUTPUT_DIR = os.environ.get('OUTPUT_DIR', os.path.join(BASE_DIR, 'output'))
+BASE_PATH = os.environ.get('BASE_PATH', '').strip()
 
 # ── 수집 Rate Limit ──
 PYKRX_DELAY = 1.0

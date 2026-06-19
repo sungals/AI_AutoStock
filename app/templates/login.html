@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TTAK Quant Login</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <link rel="stylesheet" href="{{ static_path('app.css') }}">
 </head>
 <body class="login-body">
   <main class="login-panel">
     <h1>TTAK Quant</h1>
-    <form method="post" action="/login">
+    <form method="post" action="{{ app_path('/login') }}">
       <label>사용자명<input name="username" autocomplete="username" required></label>
       <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
       {% if error %}<p class="error">{{ error }}</p>{% endif %}

@@ -12,6 +12,7 @@ from flask import Flask, Response, jsonify, redirect, render_template, request, 
 
 import auth
 import db_core
+import config
 
 
 def _limit_arg(default: int = 50, cap: int = 200) -> int:
@@ -28,20 +29,42 @@ def _rowdicts(rows):
 _RATE_BUCKETS = {}
 
 
+def _normalize_base_path(value):
+    path = (value or '').strip()
+    if not path or path == '/':
+        return ''
+    if not path.startswith('/'):
+        path = '/' + path
+    return path.rstrip('/')
+
+
+def _join_base_path(base_path, path):
+    base = _normalize_base_path(base_path)
+    target = path if path.startswith('/') else '/' + path
+    if not base:
+        return target
+    return base + target
+
+
 def create_app(db_path=None, testing: bool = False, auth_required=None,
-               rate_limit_count: int = 120, rate_limit_window: int = 60) -> Flask:
+               rate_limit_count: int = 120, rate_limit_window: int = 60,
+               base_path=None) -> Flask:
     app = Flask(__name__, template_folder='templates')
     app.config['DB_PATH'] = db_path
     app.config['TESTING'] = testing
     app.config['AUTH_REQUIRED'] = (not testing) if auth_required is None else auth_required
     app.config['RATE_LIMIT_COUNT'] = rate_limit_count
     app.config['RATE_LIMIT_WINDOW'] = rate_limit_window
+    app.config['BASE_PATH'] = _normalize_base_path(base_path if base_path is not None else config.BASE_PATH)
     app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-secret')
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_SECURE'] = not testing and os.environ.get('FLASK_ENV') != 'development'
     db_core.init_db(db_path)
     _RATE_BUCKETS.clear()
+
+    def app_path(path='/'):
+        return _join_base_path(app.config['BASE_PATH'], path)
 
     def current_user():
         uid = session.get('user_id')
@@ -62,9 +85,17 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
         @wraps(fn)
         def wrapper(*args, **kwargs):
             if app.config['AUTH_REQUIRED'] and current_user() is None:
-                return redirect(url_for('login_page'))
+                return redirect(app_path('/login'))
             return fn(*args, **kwargs)
         return wrapper
+
+    @app.context_processor
+    def inject_helpers():
+        return {
+            'app_path': app_path,
+            'static_path': lambda filename: app_path('/static/' + filename.lstrip('/')),
+            'base_path': app.config['BASE_PATH'],
+        }
 
     @app.before_request
     def rate_limit():
@@ -89,7 +120,7 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
     @app.get('/login')
     def login_page():
         if current_user() is not None:
-            return redirect(url_for('dashboard'))
+            return redirect(app_path('/'))
         return render_template('login.html', error='')
 
     @app.post('/login')
@@ -102,12 +133,12 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
             return render_template('login.html', error='로그인 실패'), 401
         session.clear()
         session['user_id'] = user['id']
-        return redirect(url_for('dashboard'))
+        return redirect(app_path('/'))
 
     @app.post('/logout')
     def logout_form():
         session.clear()
-        return redirect(url_for('login_page'))
+        return redirect(app_path('/login'))
 
     @app.get('/')
     @require_page_auth
