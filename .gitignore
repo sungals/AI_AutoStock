@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+app/venv/
+
+# Secrets and local sessions
+.env
+*.env
+app/.env
+cookies.txt
+app/cookies.txt
+
+# Runtime data
+*.db
+*.db-shm
+*.db-wal
+app/quant_data.db
+app/quant_data.db-shm
+app/quant_data.db-wal
+logs/*.log
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Generated output
+app/output/

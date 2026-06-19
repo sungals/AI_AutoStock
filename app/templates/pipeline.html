@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section-head">
+  <h1>파이프라인</h1>
+  <p>{{ run_date }}</p>
+</section>
+<table>
+  <thead><tr><th>단계</th><th>상태</th><th>시작</th><th>종료</th><th>메시지</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.stage }}</td>
+      <td>{{ row.status }}</td>
+      <td>{{ row.started_at }}</td>
+      <td>{{ row.finished_at or '' }}</td>
+      <td>{{ row.message or '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

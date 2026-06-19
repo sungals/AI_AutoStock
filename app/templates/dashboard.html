@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section-head">
+  <h1>대시보드</h1>
+  <p>{{ user.username }}</p>
+</section>
+<section class="metric-grid">
+  <a class="metric-tile accent-blue" href="/screening">
+    <span>스크리닝</span><strong>{{ screening_count }}</strong><em>{{ screen_date or '-' }}</em>
+  </a>
+  <a class="metric-tile accent-green" href="/fusion">
+    <span>융합 시그널</span><strong>{{ fusion_count }}</strong><em>{{ fusion_date or '-' }}</em>
+  </a>
+  <a class="metric-tile accent-slate" href="/pipeline">
+    <span>파이프라인</span><strong>{{ steps|length }}</strong><em>최근 로그</em>
+  </a>
+</section>
+
+<section class="dashboard-grid">
+  <section class="panel span-7">
+    <div class="panel-head">
+      <h2>전략별 선별 분포</h2>
+      <a href="/screening">전체 보기</a>
+    </div>
+    <div class="bar-list">
+      {% for row in strategy_counts %}
+      <a class="bar-row" href="/screening?strategy={{ row.strategy }}">
+        <span class="bar-label">{{ row.strategy }}</span>
+        <span class="bar-track"><span class="bar-fill" style="width: {{ row.width }}%"></span></span>
+        <strong>{{ row.count }}</strong>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel span-5">
+    <div class="panel-head">
+      <h2>융합 랭킹</h2>
+      <a href="/fusion">상세</a>
+    </div>
+    <div class="rank-list">
+      {% for row in fusion_top %}
+      <div class="rank-row">
+        <span>{{ loop.index }}</span>
+        <strong>{{ row.stock_code }}</strong>
+        <em>{{ row.recommendation }}</em>
+        <div class="score-line"><span style="width: {{ row.width }}%"></span></div>
+        <b>{{ "%.2f"|format(row.fusion_score) }}</b>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel span-6">
+    <div class="panel-head">
+      <h2>매크로</h2>
+    </div>
+    <div class="macro-grid">
+      {% for row in macro_rows %}
+      <div class="macro-item">
+        <span>{{ row.symbol }}</span>
+        <strong>{{ "%.2f"|format(row.close) }}</strong>
+        <em class="{% if row.change_pct >= 0 %}pos{% else %}neg{% endif %}">
+          {{ "%+.2f"|format(row.change_pct) }}%
+        </em>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel span-6">
+    <div class="panel-head">
+      <h2>최근 파이프라인</h2>
+      <a href="/pipeline">로그</a>
+    </div>
+    <div class="step-list">
+      {% for row in steps %}
+      <div class="step-row">
+        <span class="status-dot status-{{ row.status }}"></span>
+        <strong>{{ row.stage }}</strong>
+        <em>{{ row.status }}</em>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+</section>
+{% endblock %}

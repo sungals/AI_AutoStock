@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section-head">
+  <h1>융합 시그널</h1>
+  <p>{{ calc_date or '-' }}</p>
+</section>
+<table>
+  <thead><tr><th>종목</th><th>회사</th><th>추천</th><th>융합</th><th>기술</th><th>경험</th><th>국면</th></tr></thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.stock_code }}</td>
+      <td>{{ row.corp_name or '' }}</td>
+      <td>{{ row.recommendation }}</td>
+      <td class="num">{{ "%.2f"|format(row.fusion_score) }}</td>
+      <td class="num">{{ "%.2f"|format(row.tech_score) }}</td>
+      <td class="num">{{ "%.2f"|format(row.emp_score) }}</td>
+      <td>{{ row.regime }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

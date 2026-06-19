@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TTAK Quant</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">TTAK Quant</a>
+    <nav>
+      <a href="/screening">스크리닝</a>
+      <a href="/fusion">융합</a>
+      <a href="/pipeline">파이프라인</a>
+    </nav>
+    <form method="post" action="/logout">
+      <button type="submit">로그아웃</button>
+    </form>
+  </header>
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
