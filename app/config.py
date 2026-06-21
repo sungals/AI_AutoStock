@@ -61,6 +61,9 @@ KIS_MODE = os.environ.get('KOREAINVESTMENT_MODE', 'mock')
 KIS_MOCK_URL = 'https://openapivts.koreainvestment.com:29443'
 KIS_PROD_URL = 'https://openapi.koreainvestment.com:9443'
 
+# 전역 킬스위치(마스터 비상정지). 1이면 모든 포트폴리오의 신규 진입을 차단한다.
+TRADING_KILL_SWITCH = os.environ.get('TRADING_KILL_SWITCH', '0') == '1'
+
 # ============================================================
 # 백테스트 신뢰성 레이어 설정 (docs/backtest-reliability/00-스펙-설계.md §6)
 # ============================================================

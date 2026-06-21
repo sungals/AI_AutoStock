@@ -99,5 +99,28 @@ paper_trader.run_paper_session(conn, pid, ['000270','005930'], broker=MemoryBrok
 paper_trader.reconcile(conn, pid, broker)
 ```
 
-**남은 작업**: 매도/손절/청산·리밸런싱, 실시간 체결통보(WebSocket) 기반 상태추적, 일일손실
-한도·킬스위치 집행, KIS mock 라이브 검증(키 투입), 성과/추적오차 기록, EOD 파이프라인 연결.
+**남은 작업**: 매도/손절/청산·리밸런싱, 실시간 체결통보(WebSocket) 기반 상태추적,
+KIS mock 라이브 검증(키 투입), 성과/추적오차 기록, EOD 파이프라인 연결.
+
+## 킬스위치 + 일일 손실한도 집행 — 구현됨
+
+`risk_guard.py` + 테이블 `risk_state`(킬스위치), `risk_daily`(일 기준 평가액).
+
+| 기능 | 설명 |
+|------|------|
+| 전역 킬스위치(config) | `TRADING_KILL_SWITCH=1` → 모든 포트폴리오 신규 진입 차단(마스터 비상정지) |
+| 전역 킬스위치(DB) | `trip_kill_switch(conn, 0, reason)` — portfolio_id=0 = 전역 |
+| 포트폴리오 킬스위치 | `trip_kill_switch(conn, pid, reason)` / `reset_kill_switch` |
+| 일일 손실한도 | 세션 시작 평가액 대비 손실이 `daily_loss_limit`(기본 3%) 이상이면 **킬스위치 자동 트립** |
+| 통합 게이트 | `pre_trade_check()` — `paper_trader`가 매매 직전 호출, 차단 시 주문 안 나감 |
+
+집행 흐름: `run_paper_session` → `pre_trade_check`(킬스위치 → 일일손실) → 통과해야 매수.
+한 번 트립되면 **가격이 회복돼도 지속**(수동 `reset` 전까지). 테스트 6건, 전체 138 passed.
+
+```python
+import risk_guard
+risk_guard.trip_kill_switch(conn, pid, '수동 정지')     # 비상정지
+risk_guard.reset_kill_switch(conn, pid)                  # 재개
+risk_guard.pre_trade_check(conn, pid, broker.get_price, '2026-06-21')
+# → {'allowed': False, 'reason': '일일 손실한도 초과 (4.0% ≥ 3.0%)'} 등
+```

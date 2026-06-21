@@ -32,6 +32,14 @@ def run_paper_session(conn, portfolio_id: int, picks: Sequence[str],
         raise RuntimeError('페이퍼 트레이딩은 mock 브로커에서만 가능합니다')
 
     trade_date = trade_date or date.today().isoformat()
+
+    # ── 리스크 게이트(킬스위치 + 일일 손실한도) ──
+    import risk_guard
+    gate = risk_guard.pre_trade_check(conn, portfolio_id, broker.get_price, trade_date)
+    if not gate['allowed']:
+        return {'halted': True, 'reason': gate['reason'],
+                'submitted': 0, 'skipped': 0, 'failed': 0, 'orders': []}
+
     holdings = db_portfolio.get_live_holdings(conn, portfolio_id)
     cash = float(pf['cash'])
     per_position_budget = float(pf['initial_capital']) * float(pf['max_position_size'])

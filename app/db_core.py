@@ -314,6 +314,22 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     finished_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_pipeline_run ON pipeline_runs(run_date, stage);
+
+-- 매매 중단 상태(킬스위치). portfolio_id=0 은 전역(global) 킬스위치.
+CREATE TABLE IF NOT EXISTS risk_state (
+    portfolio_id INTEGER PRIMARY KEY,
+    halted       INTEGER NOT NULL DEFAULT 0,
+    reason       TEXT,
+    halted_at    TEXT
+);
+
+-- 일일 손실한도 기준값(세션 시작 시점 평가액).
+CREATE TABLE IF NOT EXISTS risk_daily (
+    portfolio_id INTEGER NOT NULL,
+    trade_date   TEXT NOT NULL,
+    start_value  REAL NOT NULL,
+    PRIMARY KEY (portfolio_id, trade_date)
+);
 """
 
 
