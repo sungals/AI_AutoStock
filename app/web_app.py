@@ -312,8 +312,13 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
     @app.get('/pipeline')
     @require_page_auth
     def pipeline_page():
-        run_date = request.args.get('date') or date.today().isoformat()
+        run_date = request.args.get('date')
         with db_core.get_connection(app.config['DB_PATH']) as conn:
+            if not run_date:
+                # 날짜 미지정 시 가장 최근 실행일을 기본값으로 (오늘 실행이 없을 수 있음)
+                row = conn.execute(
+                    "SELECT MAX(run_date) AS d FROM pipeline_runs").fetchone()
+                run_date = (row['d'] if row and row['d'] else date.today().isoformat())
             rows = conn.execute(
                 """SELECT stage, status, message, started_at, finished_at
                    FROM pipeline_runs WHERE run_date=? ORDER BY id""",

@@ -2,7 +2,7 @@
 {% block content %}
 <section class="section-head">
   <h1>파이프라인</h1>
-  <p>{{ run_date }}</p>
+  <p>{{ run_date or '-' }} · {{ rows|length }}단계</p>
 </section>
 <table>
   <thead><tr><th>단계</th><th>상태</th><th>시작</th><th>종료</th><th>메시지</th></tr></thead>
@@ -10,12 +10,15 @@
     {% for row in rows %}
     <tr>
       <td>{{ row.stage }}</td>
-      <td>{{ row.status }}</td>
+      <td><span class="status-dot status-{{ row.status }}"></span> {{ row.status }}</td>
       <td>{{ row.started_at }}</td>
       <td>{{ row.finished_at or '' }}</td>
       <td>{{ row.message or '' }}</td>
     </tr>
     {% endfor %}
+    {% if not rows %}
+    <tr><td colspan="5" class="empty-state">해당 날짜의 파이프라인 기록이 없습니다.</td></tr>
+    {% endif %}
   </tbody>
 </table>
 {% endblock %}

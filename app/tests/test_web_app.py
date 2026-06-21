@@ -154,3 +154,21 @@ def test_dashboard_renders_representative_market_panels(tmp_path):
     assert 'KOSDAQ' in body
     assert '삼성전자' in body
     assert '에코프로비엠' in body
+
+
+def test_pipeline_page_defaults_to_latest_run_date(tmp_path):
+    """오늘 실행이 없어도 가장 최근 실행일 기록을 보여준다(빈 표 방지)."""
+    dbp = str(tmp_path / 'q.db')
+    db_core.init_db(dbp)
+    import db_ops
+    sid = db_ops.log_start(dbp, '2026-06-19', 'screening')
+    db_ops.log_finish(dbp, sid, 'completed', 'ok')
+
+    app = web_app.create_app(db_path=dbp, testing=True)
+    res = app.test_client().get('/pipeline')   # date 미지정 → 최신(2026-06-19)
+    body = res.data.decode('utf-8')
+
+    assert res.status_code == 200
+    assert '2026-06-19' in body
+    assert 'screening' in body
+    assert '1단계' in body

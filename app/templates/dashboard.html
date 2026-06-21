@@ -36,6 +36,50 @@
     </section>
 
     <section class="dashboard-grid">
+      <section class="panel span-12">
+        <div class="panel-head">
+          <h2>대표 종목 20</h2>
+          <span class="panel-note">KOSPI 10 / KOSDAQ 10</span>
+        </div>
+        <div class="market-panels">
+          {% for market in ['KOSPI', 'KOSDAQ'] %}
+          {% if selected_market == 'ALL' or selected_market == market %}
+          <div class="market-panel">
+            <div class="market-panel-head">
+              <strong>{{ market }}</strong>
+              <span>{{ rep_rows.get(market, [])|length }}개</span>
+            </div>
+            <div class="rep-list">
+              {% for row in rep_rows.get(market, []) %}
+              <div class="rep-row">
+                <span class="rep-rank">{{ loop.index }}</span>
+                <strong>{{ row.corp_name }}</strong>
+                <em>{{ row.stock_code }}</em>
+                <span class="rep-close">{{ row.close if row.close is not none else '-' }}</span>
+                <span class="rep-change {% if row.change_pct is not none and row.change_pct >= 0 %}pos{% else %}neg{% endif %}">
+                  {% if row.change_pct is not none %}
+                    {{ "%+.2f"|format(row.change_pct) }}%
+                  {% else %}
+                    -
+                  {% endif %}
+                </span>
+                <span class="rep-meta">
+                  {%- if row.recommendation %}{{ row.recommendation | recommendation_ko }}
+                  {%- elif row.screen_strategy %}{{ row.screen_strategy | strategy_ko }}
+                  {%- else %}-{% endif %}
+                </span>
+              </div>
+              {% endfor %}
+              {% if not rep_rows.get(market) %}
+              <p class="empty-state">대표 종목 데이터가 없습니다.</p>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+
       <section class="panel span-7">
         <div class="panel-head">
           <h2>전략별 선별 분포</h2>
@@ -99,50 +143,6 @@
             <strong>{{ row.stage }}</strong>
             <em>{{ row.status }}</em>
           </div>
-          {% endfor %}
-        </div>
-      </section>
-
-      <section class="panel span-12">
-        <div class="panel-head">
-          <h2>대표 종목 20</h2>
-          <span class="panel-note">KOSPI 10 / KOSDAQ 10</span>
-        </div>
-        <div class="market-panels">
-          {% for market in ['KOSPI', 'KOSDAQ'] %}
-          {% if selected_market == 'ALL' or selected_market == market %}
-          <div class="market-panel">
-            <div class="market-panel-head">
-              <strong>{{ market }}</strong>
-              <span>{{ rep_rows.get(market, [])|length }}개</span>
-            </div>
-            <div class="rep-list">
-              {% for row in rep_rows.get(market, []) %}
-              <div class="rep-row">
-                <span class="rep-rank">{{ loop.index }}</span>
-                <strong>{{ row.corp_name }}</strong>
-                <em>{{ row.stock_code }}</em>
-                <span class="rep-close">{{ row.close if row.close is not none else '-' }}</span>
-                <span class="rep-change {% if row.change_pct is not none and row.change_pct >= 0 %}pos{% else %}neg{% endif %}">
-                  {% if row.change_pct is not none %}
-                    {{ "%+.2f"|format(row.change_pct) }}%
-                  {% else %}
-                    -
-                  {% endif %}
-                </span>
-                <span class="rep-meta">
-                  {%- if row.recommendation %}{{ row.recommendation | recommendation_ko }}
-                  {%- elif row.screen_strategy %}{{ row.screen_strategy | strategy_ko }}
-                  {%- else %}-{% endif %}
-                </span>
-              </div>
-              {% endfor %}
-              {% if not rep_rows.get(market) %}
-              <p class="empty-state">대표 종목 데이터가 없습니다.</p>
-              {% endif %}
-            </div>
-          </div>
-          {% endif %}
           {% endfor %}
         </div>
       </section>
