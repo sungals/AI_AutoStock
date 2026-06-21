@@ -151,6 +151,72 @@ def stage_simulation(db_path: Optional[str], ctx: Dict) -> str:
         res['completed'], res['gate_passed'], res.get('batch_id', '')[:8])
 
 
+def _latest_close(conn, stock_code: str, as_of: str) -> Optional[int]:
+    row = conn.execute(
+        "SELECT close FROM price_data WHERE stock_code=? AND trade_date<=? "
+        "ORDER BY trade_date DESC LIMIT 1", (stock_code, as_of)).fetchone()
+    return int(row['close']) if row and row['close'] else None
+
+
+def _ensure_paper_portfolio(conn) -> int:
+    row = conn.execute(
+        "SELECT id FROM live_portfolios WHERE name='eod-paper'").fetchone()
+    if row:
+        return row['id']
+    import db_portfolio
+    return db_portfolio.create_live_portfolio(
+        conn, 'eod-paper', initial_capital=10_000_000.0, mode='mock')
+
+
+def _db_priced_broker(conn, portfolio_id: int, as_of: str, picks):
+    """DB 최신 종가로 가격을 매기고, 현재 보유를 반영한 오프라인 모의 브로커."""
+    import db_portfolio
+    from broker.memory import MemoryBroker
+    holdings = db_portfolio.get_live_holdings(conn, portfolio_id)
+    codes = set(holdings) | set(picks)
+    prices = {}
+    for c in codes:
+        px = _latest_close(conn, c, as_of)
+        if px:
+            prices[c] = px
+    brk = MemoryBroker(prices=prices)
+    brk.positions.update(holdings)        # DB 보유와 일치(정합성)
+    return brk
+
+
+def stage_paper_trade(db_path: Optional[str], ctx: Dict) -> str:
+    """모의매매 — 청산(손절/트레일/타임아웃) 후 신규 진입. 기본 OFF.
+
+    DB 최신 종가 기반 오프라인 페이퍼(키/네트워크 불필요). 모의 포트폴리오 'eod-paper'.
+    """
+    if not ctx.get('do_paper_trade'):
+        return 'skipped (do_paper_trade=False)'
+    import db_portfolio
+    import exit_manager
+    import paper_trader
+
+    screen_date = ctx.get('screen_date') or _latest_trade_date(db_path)
+    if not screen_date:
+        raise RuntimeError('가격 데이터 없음 — 모의매매 불가')
+    strategy = ctx.get('trade_strategy', 'value')
+    top_n = ctx.get('trade_top_n', 10)
+
+    with db_core.get_connection(db_path) as conn:
+        pid = _ensure_paper_portfolio(conn)
+        picks = [r['stock_code'] for r in conn.execute(
+            """SELECT stock_code FROM screening_results
+               WHERE strategy=? AND screen_date=? ORDER BY score DESC LIMIT ?""",
+            (strategy, screen_date, top_n)).fetchall()]
+        broker = _db_priced_broker(conn, pid, screen_date, picks)
+        ex = exit_manager.run_exits(conn, pid, broker, trade_date=screen_date)
+        en = paper_trader.run_paper_session(
+            conn, pid, picks, broker=broker, trade_date=screen_date, reason=strategy)
+        if en.get('halted'):
+            return 'exits=%d (sold) | entries HALTED: %s' % (ex['sold'], en['reason'])
+        return 'portfolio=%d strat=%s | 청산 %d / 진입 %d (skip %d, fail %d)' % (
+            pid, strategy, ex['sold'], en['submitted'], en['skipped'], en['failed'])
+
+
 def stage_fusion(db_path: Optional[str], ctx: Dict) -> str:
     import fusion_analyzer
     import macro_data
@@ -189,6 +255,7 @@ STAGES = [
     ('macro', stage_macro),
     ('screening', stage_screening),
     ('fusion', stage_fusion),
+    ('paper_trade', stage_paper_trade),
     ('simulation', stage_simulation),
     ('optimize', stage_optimize),
     ('report', stage_report),
@@ -199,7 +266,9 @@ def run_pipeline(db_path: Optional[str] = None, run_date: Optional[str] = None,
                  window: Optional[Tuple[str, str]] = None, do_collect: bool = False,
                  collect_opts: Optional[Dict] = None, do_news: bool = False,
                  news_display: int = 20, do_macro: bool = False, n_sim: int = 9,
-                 screen_date: Optional[str] = None, dry_run: bool = False) -> Dict:
+                 screen_date: Optional[str] = None, do_paper_trade: bool = False,
+                 trade_strategy: str = 'value', trade_top_n: int = 10,
+                 dry_run: bool = False) -> Dict:
     """EOD 파이프라인 실행.
 
     Returns:
@@ -210,7 +279,8 @@ def run_pipeline(db_path: Optional[str] = None, run_date: Optional[str] = None,
     ctx = {'do_collect': do_collect, 'collect_opts': collect_opts, 'n_sim': n_sim,
            'window': window, 'screen_date': screen_date,
            'do_news': do_news, 'news_display': news_display,
-           'do_macro': do_macro}  # type: Dict
+           'do_macro': do_macro, 'do_paper_trade': do_paper_trade,
+           'trade_strategy': trade_strategy, 'trade_top_n': trade_top_n}  # type: Dict
     summary = {'run_date': run_date, 'stages': []}  # type: Dict
 
     for name, fn in STAGES:
@@ -246,6 +316,10 @@ def _main(argv: Optional[List[str]] = None) -> int:
     p.add_argument('--years', default=None, help='재무 수집 연도 콤마구분 (예: 2022,2023)')
     p.add_argument('--markets', default=None, help='시장 콤마구분 (예: KOSPI,KOSDAQ)')
     p.add_argument('--stocks', default=None, help='수집 종목코드 콤마구분 (미지정=전체)')
+    p.add_argument('--paper-trade', action='store_true',
+                   help='모의매매 수행(청산+진입, 오프라인 페이퍼)')
+    p.add_argument('--trade-strategy', default='value', help='모의매매 진입 전략')
+    p.add_argument('--trade-top-n', type=int, default=10, help='진입 후보 상위 N')
     args = p.parse_args(argv)
 
     collect_opts = None
@@ -265,7 +339,9 @@ def _main(argv: Optional[List[str]] = None) -> int:
     summary = run_pipeline(db_path=args.db, do_collect=args.collect,
                            collect_opts=collect_opts, n_sim=args.n_sim,
                            do_news=args.news, news_display=args.news_display,
-                           do_macro=args.macro,
+                           do_macro=args.macro, do_paper_trade=args.paper_trade,
+                           trade_strategy=args.trade_strategy,
+                           trade_top_n=args.trade_top_n,
                            dry_run=args.dry_run)
     print('[EOD %s]' % summary['run_date'])
     for name, status in summary['stages']:

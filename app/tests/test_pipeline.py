@@ -193,9 +193,25 @@ def test_pipeline_runs_all_stages(seeded_db):
     stages_logged = [r['stage'] for r in logs]
     assert stages_logged == [
         'collect', 'market_cap', 'technical', 'news', 'macro', 'screening',
-        'fusion', 'simulation', 'optimize', 'report']
+        'fusion', 'paper_trade', 'simulation', 'optimize', 'report']
     assert dict(summary['stages'])['market_cap'] == 'completed'
+    assert dict(summary['stages'])['paper_trade'] == 'completed'   # 기본 skip
     assert summary['report'] is not None
+
+
+def test_pipeline_paper_trade_stage_executes(fundamentals_db):
+    dbp, dates = fundamentals_db
+    summary = pipe.run_pipeline(dbp, do_collect=False, do_paper_trade=True,
+                                trade_strategy='value', trade_top_n=5, n_sim=1)
+    assert dict(summary['stages'])['paper_trade'] == 'completed'
+    with db_core.get_connection(dbp) as conn:
+        pf = conn.execute(
+            "SELECT id FROM live_portfolios WHERE name='eod-paper'").fetchone()
+        assert pf is not None                       # 모의 포트폴리오 생성됨
+        trades = conn.execute(
+            "SELECT COUNT(*) c FROM live_trades WHERE portfolio_id=?",
+            (pf['id'],)).fetchone()['c']
+    assert trades > 0                                # value 진입 매수 발생
 
 
 def test_pipeline_dry_run_skips_everything(seeded_db):

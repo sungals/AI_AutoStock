@@ -100,7 +100,26 @@ paper_trader.reconcile(conn, pid, broker)
 ```
 
 **남은 작업**: 리밸런싱, 실시간 체결통보(WebSocket) 기반 상태추적,
-KIS mock 라이브 검증(키 투입), 성과/추적오차 기록, EOD 파이프라인 연결.
+KIS mock 라이브 검증(키 투입), 성과/추적오차 기록.
+
+## EOD 파이프라인 연결 — 구현됨
+
+`run_daily_pipeline.py`에 **`paper_trade` 스테이지**를 fusion 직후에 추가.
+
+- **기본 OFF**(`do_paper_trade=False`) — 자동매매는 명시적으로 켤 때만.
+- **오프라인 페이퍼**: DB 최신 종가로 가격을 매기는 MemoryBroker(키·네트워크 불필요),
+  모의 포트폴리오 `eod-paper`(없으면 생성).
+- 흐름: **청산 먼저**(`exit_manager.run_exits`) → **진입**(`paper_trader.run_paper_session`,
+  기본 value 상위 N) → 리스크 게이트(킬스위치·일일손실) 자동 적용.
+- CLI: `--paper-trade [--trade-strategy value] [--trade-top-n 10]`.
+
+E2E(실 DB): value 상위 6 → 청산 0 / 진입 5, 현금 차감 확인. 스테이지 순서:
+`… screening → fusion → paper_trade → simulation → optimize → report`.
+테스트: 파이프라인 스테이지 순서 + 모의매매 실행. **전체 146 passed.**
+
+```bash
+python run_daily_pipeline.py --paper-trade --trade-strategy value --trade-top-n 10
+```
 
 ## 청산(매도/손절) 로직 — 구현됨
 
