@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS companies (
     corp_name  TEXT NOT NULL,
     sector     TEXT,
     market     TEXT DEFAULT 'KOSPI',
+    shares_outstanding INTEGER,
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -344,6 +345,10 @@ def _migrate_add_reliability_columns(conn) -> None:
     """백테스트 신뢰성 레이어 컬럼 추가 (멱등)."""
     if 'disclosed_at' not in _table_cols(conn, 'financial_statements'):
         conn.execute("ALTER TABLE financial_statements ADD COLUMN disclosed_at TEXT")
+
+    # 발행주식수 캐시 (시총 계산용; DART 재호출 최소화)
+    if 'shares_outstanding' not in _table_cols(conn, 'companies'):
+        conn.execute("ALTER TABLE companies ADD COLUMN shares_outstanding INTEGER")
 
     sim_cols = [
         ('is_cagr', 'REAL'), ('oos_cagr', 'REAL'), ('deflated_sharpe', 'REAL'),

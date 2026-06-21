@@ -51,3 +51,25 @@ def test_disclosed_at_fallback_when_null():
     assert len(rows) == 1
     # 채워진 disclosed_at은 추정값
     assert rows[0]['disclosed_at'] >= '2024-03-01'
+
+
+def test_metrics_prefers_balance_sheet_over_sce():
+    """같은 account_id가 BS/SCE 중복 시, 자본총계는 BS(총액)를 골라야 한다."""
+    conn = _make_conn()
+    # 2024 사업보고서: 자본총계 BS=400조(정답), SCE=4조(부분값)
+    for sj, amt in (('BS', 400_000_000_000_000), ('SCE', 4_000_000_000_000)):
+        conn.execute(
+            "INSERT INTO financial_statements "
+            "(corp_code,bsns_year,reprt_code,fs_div,sj_div,account_id,thstrm_amount,disclosed_at) "
+            "VALUES ('C','2024','11011','CFS',?,?,?, '2025-03-15')",
+            (sj, 'ifrs-full_Equity', amt))
+    # 순이익 IS=40조(정답), SCE=0
+    for sj, amt in (('IS', 40_000_000_000_000), ('SCE', 0)):
+        conn.execute(
+            "INSERT INTO financial_statements "
+            "(corp_code,bsns_year,reprt_code,fs_div,sj_div,account_id,thstrm_amount,disclosed_at) "
+            "VALUES ('C','2024','11011','CFS',?,?,?, '2025-03-15')",
+            (sj, 'ifrs-full_ProfitLoss', amt))
+    m = pit.get_metrics_asof(conn, 'C', '2025-06-01')
+    # ROE = 40조/400조*100 = 10 (SCE 4조를 썼다면 1000이 됨)
+    assert abs(m['roe'] - 10.0) < 0.01

@@ -1,6 +1,7 @@
 # 백테스트 신뢰성 레이어 — 개발/테스트 의존성
 # 설치: python3 -m venv venv && venv/bin/pip install -r requirements-dev.txt
 Flask
+Flask-WTF
 Werkzeug
 numpy
 pandas

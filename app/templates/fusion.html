@@ -11,7 +11,7 @@
     <tr>
       <td>{{ row.stock_code }}</td>
       <td>{{ row.corp_name or '' }}</td>
-      <td>{{ row.recommendation }}</td>
+      <td>{{ row.recommendation | recommendation_ko }}</td>
       <td class="num">{{ "%.2f"|format(row.fusion_score) }}</td>
       <td class="num">{{ "%.2f"|format(row.tech_score) }}</td>
       <td class="num">{{ "%.2f"|format(row.emp_score) }}</td>

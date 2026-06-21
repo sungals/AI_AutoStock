@@ -192,8 +192,9 @@ def test_pipeline_runs_all_stages(seeded_db):
             "SELECT stage, status FROM pipeline_runs ORDER BY id").fetchall()
     stages_logged = [r['stage'] for r in logs]
     assert stages_logged == [
-        'collect', 'technical', 'news', 'macro', 'screening',
+        'collect', 'market_cap', 'technical', 'news', 'macro', 'screening',
         'fusion', 'simulation', 'optimize', 'report']
+    assert dict(summary['stages'])['market_cap'] == 'completed'
     assert summary['report'] is not None
 
 

@@ -45,7 +45,7 @@
     <div class="bar-list">
       {% for row in strategy_counts %}
       <a class="bar-row" href="{{ app_path('/screening') }}?strategy={{ row.strategy }}">
-        <span class="bar-label">{{ row.strategy }}</span>
+        <span class="bar-label">{{ row.strategy | strategy_ko }}</span>
         <span class="bar-track"><span class="bar-fill" style="width: {{ row.width }}%"></span></span>
         <strong>{{ row.count }}</strong>
       </a>
@@ -63,7 +63,7 @@
       <div class="rank-row">
         <span>{{ loop.index }}</span>
         <strong>{{ row.stock_code }}</strong>
-        <em>{{ row.recommendation }}</em>
+        <em>{{ row.recommendation | recommendation_ko }}</em>
         <div class="score-line"><span style="width: {{ row.width }}%"></span></div>
         <b>{{ "%.2f"|format(row.fusion_score) }}</b>
       </div>
@@ -131,7 +131,11 @@
                 -
               {% endif %}
             </span>
-            <span class="rep-meta">{{ row.recommendation or row.screen_strategy or '-' }}</span>
+            <span class="rep-meta">
+              {%- if row.recommendation %}{{ row.recommendation | recommendation_ko }}
+              {%- elif row.screen_strategy %}{{ row.screen_strategy | strategy_ko }}
+              {%- else %}-{% endif %}
+            </span>
           </div>
           {% endfor %}
           {% if not rep_rows.get(market) %}

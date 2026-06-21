@@ -10,6 +10,7 @@
   <main class="login-panel">
     <h1>TTAK Quant</h1>
     <form method="post" action="{{ app_path('/login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>사용자명<input name="username" autocomplete="username" required></label>
       <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
       {% if error %}<p class="error">{{ error }}</p>{% endif %}

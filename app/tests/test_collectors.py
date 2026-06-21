@@ -152,3 +152,103 @@ def test_collect_financials_disclosure_fallback_to_estimate(tmp_path):
     with db_core.get_connection(dbp) as conn:
         row = conn.execute("SELECT disclosed_at FROM financial_statements").fetchone()
     assert row['disclosed_at'] >= '2024-03-01'    # estimate_disclosed_at(2023,11011)
+
+
+# ── 발행주식수 → 시가총액 (KRX 우회) ──
+
+def test_fetch_total_shares_prefers_common(monkeypatch):
+    def fake(path, params):
+        assert path == 'stockTotqySttus.json'
+        return {'status': '000', 'list': [
+            {'se': '보통주', 'istc_totqy': '5,969,782,550'},
+            {'se': '우선주', 'istc_totqy': '822,886,700'},
+        ]}
+    monkeypatch.setattr(financial_collector, '_dart_get', fake)
+    n = financial_collector.fetch_total_shares('K', '00126380', '2023')
+    assert n == 5969782550
+
+
+def test_fetch_total_shares_falls_back_to_total(monkeypatch):
+    def fake(path, params):
+        return {'status': '000', 'list': [{'se': '합계', 'istc_totqy': '1,000'}]}
+    monkeypatch.setattr(financial_collector, '_dart_get', fake)
+    assert financial_collector.fetch_total_shares('K', 'C', '2023') == 1000
+
+
+def test_populate_market_cap_updates_rows(tmp_path):
+    dbp = str(tmp_path / 'q.db')
+    db_core.init_db(dbp)
+    with db_core.get_connection(dbp) as conn:
+        conn.execute("INSERT INTO companies (corp_code, stock_code, corp_name) "
+                     "VALUES ('00126380','005930','삼성전자')")
+        conn.execute("INSERT INTO companies (corp_code, stock_code, corp_name) "
+                     "VALUES ('X000999','000999','폴백corp')")   # 실 corp_code 아님 → 제외
+        for dt, close in (('2024-01-02', 70000), ('2024-01-03', 72000)):
+            conn.execute("INSERT INTO price_data (stock_code, trade_date, close) "
+                         "VALUES ('005930',?,?)", (dt, close))
+        conn.execute("INSERT INTO price_data (stock_code, trade_date, close) "
+                     "VALUES ('000999','2024-01-02',100)")
+
+    def fake_shares(api_key, corp_code, year):
+        return 5_000_000_000 if corp_code == '00126380' else None
+
+    with db_core.get_connection(dbp) as conn:
+        res = financial_collector.populate_market_cap(
+            conn, api_key='K', shares_fn=fake_shares)
+        rows = conn.execute(
+            "SELECT trade_date, market_cap FROM price_data WHERE stock_code='005930' "
+            "ORDER BY trade_date").fetchall()
+        fallback = conn.execute(
+            "SELECT market_cap FROM price_data WHERE stock_code='000999'").fetchone()
+
+    assert res['updated'] == 1 and res['rows'] == 2
+    assert rows[0]['market_cap'] == 70000 * 5_000_000_000      # 종가 × 주식수
+    assert rows[1]['market_cap'] == 72000 * 5_000_000_000
+    assert fallback['market_cap'] is None                       # X corp_code 제외
+
+
+def test_populate_market_cap_skips_without_key(tmp_path):
+    dbp = str(tmp_path / 'q.db')
+    db_core.init_db(dbp)
+    with db_core.get_connection(dbp) as conn:
+        res = financial_collector.populate_market_cap(conn, api_key='')
+    assert res['skipped'] is True
+
+
+def test_populate_market_cap_caches_shares_and_increments(tmp_path):
+    """주식수 캐시 + market_cap NULL 행만 갱신 → 매일 실행 시 DART 재호출 최소화."""
+    dbp = str(tmp_path / 'q.db')
+    db_core.init_db(dbp)
+    with db_core.get_connection(dbp) as conn:
+        conn.execute("INSERT INTO companies (corp_code, stock_code, corp_name) "
+                     "VALUES ('00126380','005930','삼성전자')")
+        conn.execute("INSERT INTO price_data (stock_code, trade_date, close) "
+                     "VALUES ('005930','2024-01-02',70000)")
+
+    calls = {'n': 0}
+
+    def counting_shares(api_key, corp_code, year):
+        calls['n'] += 1
+        return 5_000_000_000
+
+    # 1) 최초: 주식수 fetch + 캐시 + 행 갱신
+    with db_core.get_connection(dbp) as conn:
+        r1 = financial_collector.populate_market_cap(conn, api_key='K', shares_fn=counting_shares)
+    assert r1['updated'] == 1 and calls['n'] == 1
+    with db_core.get_connection(dbp) as conn:
+        sh = conn.execute("SELECT shares_outstanding FROM companies WHERE corp_code='00126380'").fetchone()
+    assert sh['shares_outstanding'] == 5_000_000_000        # 캐시됨
+
+    # 2) 변화 없음: 갱신할 NULL 행 없음 → fetch 없음
+    with db_core.get_connection(dbp) as conn:
+        r2 = financial_collector.populate_market_cap(conn, api_key='K', shares_fn=counting_shares)
+    assert r2['updated'] == 0 and calls['n'] == 1           # 재호출 안 함
+
+    # 3) 새 가격행 추가: 캐시된 주식수로 갱신, 여전히 fetch 없음
+    with db_core.get_connection(dbp) as conn:
+        conn.execute("INSERT INTO price_data (stock_code, trade_date, close) "
+                     "VALUES ('005930','2024-01-03',72000)")
+        r3 = financial_collector.populate_market_cap(conn, api_key='K', shares_fn=counting_shares)
+        cap = conn.execute("SELECT market_cap FROM price_data WHERE trade_date='2024-01-03'").fetchone()
+    assert r3['updated'] == 1 and calls['n'] == 1           # 캐시 사용, 재호출 없음
+    assert cap['market_cap'] == 72000 * 5_000_000_000

@@ -81,6 +81,20 @@ def _market_cap_asof(conn, stock_code: str, as_of_date: str) -> Optional[int]:
     return None
 
 
+def _pick_account(accmap, account_id, prefer_sj):
+    """(account_id, sj_div) 맵에서 선호 재무제표(sj_div) 순으로 값을 고른다.
+
+    선호 sj_div를 못 찾으면 해당 account_id의 아무 sj_div나 폴백(빈 sj_div 포함).
+    """
+    for sj in prefer_sj:
+        if (account_id, sj) in accmap:
+            return accmap[(account_id, sj)]
+    for (aid, _sj), amount in accmap.items():
+        if aid == account_id:
+            return amount
+    return None
+
+
 # IFRS 계정 ID (자주 쓰는 것들)
 _ACC_REVENUE = 'ifrs-full_Revenue'
 _ACC_OPINCOME = 'dart_OperatingIncomeLoss'
@@ -105,11 +119,14 @@ def get_metrics_asof(conn, corp_code: str, as_of_date: str,
     if not fins:
         return {}
 
-    # 연간(사업보고서) 데이터를 연도별 계정 맵으로 (공시된 것만 포함됨 → PIT 보장)
-    annual = {}  # type: Dict[str, Dict[str, int]]
+    # 연간(사업보고서) 데이터를 연도별 (계정, 재무제표구분) 맵으로 저장.
+    # 같은 account_id가 BS/IS/CIS/CF/SCE에 중복 등장하므로 sj_div까지 키에 포함해
+    # 올바른 재무제표에서 값을 골라야 한다(예: 자본총계는 BS, SCE의 부분값 아님).
+    annual = {}  # type: Dict[str, Dict[Tuple[str, str], int]]
     for f in fins:
         if f.get('reprt_code') == '11011' and f.get('thstrm_amount') is not None:
-            annual.setdefault(f['bsns_year'], {})[f['account_id']] = f['thstrm_amount']
+            key = (f['account_id'], (f.get('sj_div') or ''))
+            annual.setdefault(f['bsns_year'], {})[key] = f['thstrm_amount']
     if not annual:
         return {}
 
@@ -117,11 +134,12 @@ def get_metrics_asof(conn, corp_code: str, as_of_date: str,
     cur = annual[years[0]]
     prev = annual[years[1]] if len(years) > 1 else {}
 
-    net_income = cur.get(_ACC_NETINCOME)
-    equity = cur.get(_ACC_EQUITY)
-    liabilities = cur.get(_ACC_LIABILITIES)
-    revenue = cur.get(_ACC_REVENUE)
-    op = cur.get(_ACC_OPINCOME)
+    # 재무상태표(BS): 자본·부채·자산 / 손익계산서(IS,CIS): 매출·이익 (SCE/CF 중복값 배제)
+    net_income = _pick_account(cur, _ACC_NETINCOME, ('IS', 'CIS', 'CF'))
+    equity = _pick_account(cur, _ACC_EQUITY, ('BS',))
+    liabilities = _pick_account(cur, _ACC_LIABILITIES, ('BS',))
+    revenue = _pick_account(cur, _ACC_REVENUE, ('IS', 'CIS'))
+    op = _pick_account(cur, _ACC_OPINCOME, ('IS', 'CIS'))
 
     out = {}  # type: Dict[str, float]
 
@@ -146,12 +164,12 @@ def get_metrics_asof(conn, corp_code: str, as_of_date: str,
         out['opm'] = round(op / revenue * 100, 2)
 
     # 매출 성장률 (전년 대비)
-    rev_prev = prev.get(_ACC_REVENUE)
+    rev_prev = _pick_account(prev, _ACC_REVENUE, ('IS', 'CIS'))
     if revenue is not None and rev_prev and rev_prev > 0:
         out['revenue_growth_yoy'] = round((revenue - rev_prev) / rev_prev * 100, 2)
 
     # 영업이익 흑자전환 (전년 적자/0 → 당기 흑자)
-    op_prev = prev.get(_ACC_OPINCOME)
+    op_prev = _pick_account(prev, _ACC_OPINCOME, ('IS', 'CIS'))
     if op is not None and op_prev is not None:
         out['opincome_turnaround'] = 1 if (op_prev <= 0 and op > 0) else 0
 

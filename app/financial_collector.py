@@ -129,3 +129,100 @@ def collect_financials(conn, corp_codes: List[str], years: List[str],
         if got_any:
             result['companies'] += 1
     return result
+
+
+@rate_limited(config.DART_DELAY)
+def fetch_total_shares(api_key: str, corp_code: str, bsns_year: str,
+                       reprt_code: str = '11011') -> Optional[int]:
+    """발행 보통주 총수 (stockTotqySttus.json). KRX 시총 차단 우회용.
+
+    se(구분)가 '보통주'인 행의 istc_totqy(발행주식 총수)를 우선 사용,
+    없으면 '합계' 행으로 폴백. 실패 시 None.
+    """
+    data = _dart_get('stockTotqySttus.json', {
+        'crtfc_key': api_key, 'corp_code': corp_code,
+        'bsns_year': bsns_year, 'reprt_code': reprt_code})
+    if data.get('status') != '000':
+        return None
+    rows = data.get('list', [])
+    for it in rows:
+        if u'보통주' in (it.get('se') or ''):
+            n = _to_int(it.get('istc_totqy'))
+            if n:
+                return n
+    for it in rows:
+        if u'합계' in (it.get('se') or ''):
+            n = _to_int(it.get('istc_totqy'))
+            if n:
+                return n
+    return None
+
+
+def populate_market_cap(conn, years=('2024', '2023', '2022'),
+                        api_key: Optional[str] = None,
+                        shares_fn: Optional[Callable] = None,
+                        refresh: bool = False) -> Dict:
+    """DART 발행주식수 × 종가로 price_data.market_cap을 채운다.
+
+    KRX 시총 엔드포인트(data.krx.co.kr)가 막혀 빈 응답을 줄 때의 우회 경로.
+    실제 corp_code가 매핑된 종목만 대상. shares_fn 주입 시 네트워크 없이 테스트 가능.
+
+    효율화(EOD 매일 실행용):
+    - 발행주식수는 `companies.shares_outstanding`에 캐시 → DART 재호출 최소화.
+    - market_cap이 비어있는 행만 갱신(refresh=True면 전체 재계산).
+    - 갱신할 행도 없고 캐시도 있으면 DART 호출 자체를 생략.
+
+    Returns: {updated, no_shares, rows, fetched}
+    """
+    if api_key is None:
+        api_key = config.OPENDART_API_KEY
+    if not api_key:
+        return {'skipped': True, 'reason': 'OPENDART_API_KEY 없음', 'updated': 0}
+    fetch = shares_fn or fetch_total_shares
+
+    companies = conn.execute(
+        "SELECT corp_code, stock_code, shares_outstanding FROM companies "
+        "WHERE corp_code NOT LIKE 'X%'").fetchall()
+    result = {'skipped': False, 'updated': 0, 'no_shares': 0, 'rows': 0, 'fetched': 0}
+    for c in companies:
+        # 갱신 대상 행 존재 여부 (refresh면 전체, 아니면 market_cap NULL인 행만)
+        if refresh:
+            need = conn.execute(
+                "SELECT COUNT(*) n FROM price_data WHERE stock_code=?",
+                (c['stock_code'],)).fetchone()['n']
+        else:
+            need = conn.execute(
+                "SELECT COUNT(*) n FROM price_data "
+                "WHERE stock_code=? AND market_cap IS NULL",
+                (c['stock_code'],)).fetchone()['n']
+        if not need:
+            continue
+
+        shares = c['shares_outstanding']
+        if shares is None or refresh:
+            shares = None
+            for y in years:
+                shares = fetch(api_key, c['corp_code'], y)
+                if shares:
+                    break
+            result['fetched'] += 1
+            if shares:
+                conn.execute(
+                    "UPDATE companies SET shares_outstanding=? WHERE corp_code=?",
+                    (shares, c['corp_code']))
+        if not shares:
+            result['no_shares'] += 1
+            continue
+
+        if refresh:
+            cur = conn.execute(
+                "UPDATE price_data SET market_cap = close * ? WHERE stock_code = ?",
+                (shares, c['stock_code']))
+        else:
+            cur = conn.execute(
+                "UPDATE price_data SET market_cap = close * ? "
+                "WHERE stock_code = ? AND market_cap IS NULL",
+                (shares, c['stock_code']))
+        result['rows'] += cur.rowcount
+        result['updated'] += 1
+    return result

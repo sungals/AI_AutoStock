@@ -81,6 +81,21 @@ def stage_screening(db_path: Optional[str], ctx: Dict) -> str:
     return 'date=%s %s' % (screen_date, ' '.join(parts))
 
 
+def stage_market_cap(db_path: Optional[str], ctx: Dict) -> str:
+    """DART 발행주식수로 price_data.market_cap 채움 (KRX 시총 차단 우회).
+
+    주식수는 companies에 캐시되어, 매일 실행 시 새 가격행만 빠르게 갱신한다.
+    DART 키 없으면 graceful skip(value/turnaround의 PER/PBR만 비게 됨).
+    """
+    import financial_collector
+    with db_core.get_connection(db_path) as conn:
+        res = financial_collector.populate_market_cap(conn, refresh=ctx.get('mc_refresh', False))
+    if res.get('skipped'):
+        return 'skipped (%s)' % res.get('reason')
+    return 'updated=%d rows=%d fetched=%d no_shares=%d' % (
+        res['updated'], res['rows'], res.get('fetched', 0), res['no_shares'])
+
+
 def stage_technical(db_path: Optional[str], ctx: Dict) -> str:
     import technical_analyzer
     calc_date = ctx.get('screen_date') or _latest_trade_date(db_path)
@@ -168,6 +183,7 @@ def stage_report(db_path: Optional[str], ctx: Dict) -> str:
 
 STAGES = [
     ('collect', stage_collect),
+    ('market_cap', stage_market_cap),
     ('technical', stage_technical),
     ('news', stage_news),
     ('macro', stage_macro),

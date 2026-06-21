@@ -4,17 +4,41 @@
 """
 from datetime import date
 import json
+import logging
 import os
+import secrets
 import time
 from functools import wraps
 
 from flask import Flask, Response, jsonify, redirect, render_template, request, session, stream_with_context, url_for
+from flask_wtf.csrf import CSRFProtect
 
 import auth
 import dashboard_data
 import db_core
 import config
+import labels
 import watchlist
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_secret_key(testing: bool) -> str:
+    """SECRET_KEY 결정 — 운영에서 알려진 약한 기본값을 절대 쓰지 않는다.
+
+    우선순위: 환경변수 SECRET_KEY > (테스트면 고정값) > 무작위 생성(경고).
+    무작위 생성 시 재시작/멀티워커 간 세션이 유지되지 않으므로 운영에서는
+    반드시 SECRET_KEY를 설정해야 한다.
+    """
+    env_key = os.environ.get('SECRET_KEY')
+    if env_key:
+        return env_key
+    if testing:
+        return 'test-only-secret'
+    logger.warning(
+        'SECRET_KEY 미설정 — 무작위 키 생성. 재시작/멀티워커 간 세션 유지 불가. '
+        '운영에서는 .env에 SECRET_KEY를 설정하세요.')
+    return secrets.token_hex(32)
 
 
 def _limit_arg(default: int = 50, cap: int = 200) -> int:
@@ -58,10 +82,19 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
     app.config['RATE_LIMIT_COUNT'] = rate_limit_count
     app.config['RATE_LIMIT_WINDOW'] = rate_limit_window
     app.config['BASE_PATH'] = _normalize_base_path(base_path if base_path is not None else config.BASE_PATH)
-    app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-secret')
+    app.secret_key = _resolve_secret_key(testing)
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_SECURE'] = not testing and os.environ.get('FLASK_ENV') != 'development'
+
+    # CSRF 보호 (테스트에서는 비활성 — 클라이언트 토큰 흐름 없이 검증)
+    app.config['WTF_CSRF_ENABLED'] = not testing
+    csrf = CSRFProtect(app)
+
+    # 표시용 한글 라벨 Jinja 필터 (링크 파라미터는 영문 키 유지)
+    app.jinja_env.filters['strategy_ko'] = labels.strategy_ko
+    app.jinja_env.filters['recommendation_ko'] = labels.recommendation_ko
+
     db_core.init_db(db_path)
     _RATE_BUCKETS.clear()
 
@@ -114,6 +147,23 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
         bucket.append(now)
         _RATE_BUCKETS[key] = bucket
         return None
+
+    @app.after_request
+    def security_headers(resp):
+        # 외부 리소스를 쓰지 않으므로 'self' 위주 엄격 CSP (디자인 영향 없음)
+        resp.headers.setdefault(
+            'Content-Security-Policy',
+            "default-src 'self'; img-src 'self' data:; style-src 'self'; "
+            "script-src 'self'; object-src 'none'; base-uri 'self'; "
+            "form-action 'self'; frame-ancestors 'none'")
+        resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        resp.headers.setdefault('X-Frame-Options', 'DENY')
+        resp.headers.setdefault('Referrer-Policy', 'same-origin')
+        # HTTPS 요청에서만 HSTS (http 개발 환경을 막지 않도록)
+        if request.is_secure:
+            resp.headers.setdefault(
+                'Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        return resp
 
     @app.get('/api/health')
     def health():
@@ -410,6 +460,13 @@ def create_app(db_path=None, testing: bool = False, auth_required=None,
         return Response(
             stream_with_context(generate()), mimetype='text/event-stream',
             headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+    # JSON 인증 API는 CSRF 토큰 흐름이 없는 프로그램적 클라이언트용으로 면제한다.
+    # 브라우저 폼(/login, /logout)은 CSRF 토큰으로 보호되며, change-password는
+    # current_password 확인으로 CSRF 공격이 추가 차단된다(공격자는 현재 비번을 모름).
+    csrf.exempt(login)
+    csrf.exempt(logout)
+    csrf.exempt(change_password)
 
     return app
 
