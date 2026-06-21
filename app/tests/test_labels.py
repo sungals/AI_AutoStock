@@ -66,7 +66,9 @@ def test_screening_and_fusion_pages_render_korean(tmp_path):
     client.post('/login', data={'username': 'admin', 'password': 'secret'})
 
     s = client.get('/screening?strategy=value').data.decode('utf-8')
-    assert '가치주' in s and 'value="value"' in s        # 표시 한글, 옵션 값은 영문 키
+    # 사이드바: 한글 라벨 표시 + 링크 파라미터는 영문 키, 현재 전략은 active
+    assert '가치주' in s and 'strategy=value' in s
+    assert 'strategy-link active' in s
 
     f = client.get('/fusion').data.decode('utf-8')
     assert '적극 매수' in f                                # STRONG_BUY → 한글

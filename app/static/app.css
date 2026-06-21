@@ -234,6 +234,42 @@ p { color: #64748b; margin: 0; }
 .status-skipped { background: #94a3b8; }
 .status-running { background: #2563eb; }
 .toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+
+/* 스크리닝: 좌측 전략 사이드바 + 우측 결과 */
+.screening-layout {
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.strategy-sidebar {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #dde2e8;
+  border-radius: 8px;
+  position: sticky;
+  top: 16px;
+}
+.strategy-link {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 6px;
+  color: #334155;
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.strategy-link:hover { background: #f1f5f9; }
+.strategy-link.active {
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+}
+.screening-main { min-width: 0; }
+.empty-state { color: #64748b; text-align: center; padding: 24px 0; }
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -280,4 +316,11 @@ input {
   .bar-row { grid-template-columns: 92px minmax(80px, 1fr) 30px; }
   .rank-row { grid-template-columns: 24px 58px 78px minmax(64px, 1fr) 48px; }
   table { display: block; overflow-x: auto; }
+  .screening-layout { grid-template-columns: 1fr; }
+  .strategy-sidebar {
+    position: static;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    overflow-x: auto;
+  }
 }
