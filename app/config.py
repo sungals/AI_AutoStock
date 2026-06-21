@@ -64,6 +64,11 @@ KIS_PROD_URL = 'https://openapi.koreainvestment.com:9443'
 # 전역 킬스위치(마스터 비상정지). 1이면 모든 포트폴리오의 신규 진입을 차단한다.
 TRADING_KILL_SWITCH = os.environ.get('TRADING_KILL_SWITCH', '0') == '1'
 
+# 청산(exit) 규칙 기본값
+EXIT_TRAIL_PCT = 0.08         # 트레일링 스탑: 최고가 대비 8% 하락
+EXIT_STOP_LOSS_PCT = 0.10     # 하드 손절: 진입가 대비 10% 하락
+EXIT_MAX_HOLD_DAYS = 90       # 보유기간 초과 청산
+
 # ============================================================
 # 백테스트 신뢰성 레이어 설정 (docs/backtest-reliability/00-스펙-설계.md §6)
 # ============================================================

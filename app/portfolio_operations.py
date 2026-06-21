@@ -9,6 +9,14 @@ def check_trailing_stop(entry_price: float, highest_price: float,
     return (highest_price - current_price) / highest_price >= trail_pct
 
 
+def check_stop_loss(entry_price: float, current_price: float,
+                    stop_pct: float = 0.10) -> bool:
+    """진입가 대비 stop_pct 이상 하락하면 True (하드 손절)."""
+    if entry_price <= 0:
+        return False
+    return (entry_price - current_price) / entry_price >= stop_pct
+
+
 def check_timeout_exit(entry_date: str, current_date: str,
                        max_days: int = 90) -> bool:
     entry = date.fromisoformat(entry_date)

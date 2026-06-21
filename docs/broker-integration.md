@@ -99,8 +99,31 @@ paper_trader.run_paper_session(conn, pid, ['000270','005930'], broker=MemoryBrok
 paper_trader.reconcile(conn, pid, broker)
 ```
 
-**남은 작업**: 매도/손절/청산·리밸런싱, 실시간 체결통보(WebSocket) 기반 상태추적,
+**남은 작업**: 리밸런싱, 실시간 체결통보(WebSocket) 기반 상태추적,
 KIS mock 라이브 검증(키 투입), 성과/추적오차 기록, EOD 파이프라인 연결.
+
+## 청산(매도/손절) 로직 — 구현됨
+
+`exit_manager.py` + 순수함수 `portfolio_operations.check_stop_loss/trailing_stop/timeout_exit`.
+
+| 규칙 | 기준(기본) | 비고 |
+|------|-----------|------|
+| 하드 손절 | 진입가 대비 −10% (`EXIT_STOP_LOSS_PCT`) | 우선순위 1 |
+| 트레일링 스탑 | 진입 후 최고가 대비 −8% (`EXIT_TRAIL_PCT`) | 최고가는 price_data로 산출 |
+| 보유기간 초과 | 90일 (`EXIT_MAX_HOLD_DAYS`) | |
+
+- `run_exits()`가 보유 포지션을 점검해 규칙 충족 시 **전량 매도**(모의), live_trades에
+  `exit_reason`·실현손익(pnl_pct) 기록, 현금 환입.
+- **청산은 킬스위치와 무관하게 항상 허용**(손절을 막으면 안 됨 — 테스트로 검증).
+- `db_portfolio.get_live_positions()`로 진입가/진입일/수량 추적.
+
+테스트 7건(손절/트레일/타임아웃/홀드/손익기록/킬스위치무관). **전체 145 passed.**
+
+```python
+import exit_manager
+exit_manager.run_exits(conn, pid, broker, trade_date='2026-06-21')
+# → {'sold':1,'held':2,'failed':0,'exits':[{'stock_code':'A','reason':'stop_loss','pnl_pct':-11.0,...}]}
+```
 
 ## 킬스위치 + 일일 손실한도 집행 — 구현됨
 

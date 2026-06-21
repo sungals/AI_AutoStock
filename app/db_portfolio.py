@@ -161,6 +161,29 @@ def get_live_holdings(conn, portfolio_id: int) -> Dict[str, int]:
     return {k: v for k, v in holdings.items() if v != 0}
 
 
+def get_live_positions(conn, portfolio_id: int) -> Dict[str, Dict]:
+    """보유 포지션 상세: {종목코드: {qty, avg_price, entry_date}}.
+
+    avg_price=매수 총액/매수 총수량, entry_date=최초 매수일. 전량매도 가정 하에 충분.
+    """
+    holdings = get_live_holdings(conn, portfolio_id)
+    out = {}  # type: Dict[str, Dict]
+    for code, qty in holdings.items():
+        if qty <= 0:
+            continue
+        row = conn.execute(
+            """SELECT MIN(trade_date) AS entry_date,
+                      SUM(amount) AS amt, SUM(quantity) AS q
+               FROM live_trades
+               WHERE portfolio_id=? AND stock_code=? AND trade_type='buy'""",
+            (portfolio_id, code)).fetchone()
+        buy_q = row['q'] or 0
+        avg = (float(row['amt']) / buy_q) if buy_q else 0.0
+        out[code] = {'qty': qty, 'avg_price': round(avg, 2),
+                     'entry_date': row['entry_date']}
+    return out
+
+
 def update_live_cash(conn, portfolio_id: int, delta: float) -> None:
     """현금 증감(매수 -, 매도 +)."""
     conn.execute(
