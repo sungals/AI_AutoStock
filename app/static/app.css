@@ -78,6 +78,7 @@ p { color: #64748b; margin: 0; }
 .span-5 { grid-column: span 5; }
 .span-6 { grid-column: span 6; }
 .span-7 { grid-column: span 7; }
+.span-12 { grid-column: span 12; }
 .panel-head {
   display: flex;
   align-items: center;
@@ -177,14 +178,25 @@ p { color: #64748b; margin: 0; }
 }
 .market-panel-head strong { font-size: 16px; }
 .market-panel-head span { color: #64748b; font-size: 12px; }
-.rep-list { display: grid; gap: 8px; }
+.rep-list { display: grid; gap: 2px; }
 .rep-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1.4fr) 74px 84px 76px minmax(80px, 1fr);
+  grid-template-columns: 26px minmax(0, 1fr) 60px 82px 64px 84px;
   align-items: center;
-  gap: 8px;
-  min-height: 30px;
+  gap: 10px;
+  min-height: 34px;
+  padding: 4px 2px;
+  border-bottom: 1px solid #eef1f5;
 }
+.rep-row:last-child { border-bottom: none; }
+.rep-row strong {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rep-row em { white-space: nowrap; }
+.rep-close, .rep-change { text-align: right; }
 .rep-rank {
   width: 22px;
   height: 22px;
