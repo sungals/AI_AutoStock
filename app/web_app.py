@@ -475,4 +475,6 @@ app = create_app()
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=int(os.environ.get('PORT', '5000')), debug=False)
+    # 기본 8000 — macOS AirPlay 수신기가 포트 5000(*:5000)을 점유해 localhost(::1)
+    # 접속이 403으로 가로채지는 충돌을 피한다. 필요 시 PORT 환경변수로 변경.
+    app.run(host='127.0.0.1', port=int(os.environ.get('PORT', '8000')), debug=False)
