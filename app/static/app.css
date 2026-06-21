@@ -270,6 +270,48 @@ p { color: #64748b; margin: 0; }
 .screening-main { min-width: 0; }
 .empty-state { color: #64748b; text-align: center; padding: 24px 0; }
 
+/* 대시보드: 좌측 필터(시장/정렬) 사이드바 + 우측 본문 */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.dash-sidebar {
+  display: grid;
+  gap: 16px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #dde2e8;
+  border-radius: 8px;
+  position: sticky;
+  top: 16px;
+}
+.filter-group { display: grid; gap: 4px; }
+.filter-group h3 {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+.filter-link {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #334155;
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.filter-link:hover { background: #f1f5f9; }
+.filter-link.active {
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+}
+.dashboard-main { min-width: 0; }
+.dashboard-main .dashboard-grid { margin-top: 14px; }
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -323,4 +365,7 @@ input {
     grid-auto-columns: max-content;
     overflow-x: auto;
   }
+  .dashboard-layout { grid-template-columns: 1fr; }
+  .dash-sidebar { position: static; }
+  .filter-group { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; }
 }

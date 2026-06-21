@@ -4,148 +4,149 @@
   <h1>대시보드</h1>
   <p>{{ user.username }}</p>
 </section>
-<form class="toolbar dashboard-toolbar" method="get" action="{{ app_path('/') }}">
-  <label>
-    시장
-    <select name="market">
-      {% for market in market_options %}
-      <option value="{{ market }}" {% if selected_market == market %}selected{% endif %}>{{ market }}</option>
+<div class="dashboard-layout">
+  <aside class="dash-sidebar" aria-label="대시보드 필터">
+    <div class="filter-group">
+      <h3>시장</h3>
+      {% for m in market_options %}
+      <a class="filter-link {% if selected_market == m %}active{% endif %}"
+         href="{{ app_path('/') }}?market={{ m }}&sort={{ selected_sort }}">{% if m == 'ALL' %}전체{% else %}{{ m }}{% endif %}</a>
       {% endfor %}
-    </select>
-  </label>
-  <label>
-    정렬
-    <select name="sort">
-      <option value="market" {% if selected_sort == 'market' %}selected{% endif %}>대표순</option>
-      <option value="fusion" {% if selected_sort == 'fusion' %}selected{% endif %}>융합 점수</option>
-      <option value="screening" {% if selected_sort == 'screening' %}selected{% endif %}>스크리닝 점수</option>
-      <option value="change" {% if selected_sort == 'change' %}selected{% endif %}>등락률</option>
-    </select>
-  </label>
-  <button type="submit">보기</button>
-</form>
-<section class="metric-grid">
-  <a class="metric-tile accent-blue" href="{{ app_path('/screening') }}">
-    <span>스크리닝</span><strong>{{ screening_count }}</strong><em>{{ screen_date or '-' }}</em>
-  </a>
-  <a class="metric-tile accent-green" href="{{ app_path('/fusion') }}">
-    <span>융합 시그널</span><strong>{{ fusion_count }}</strong><em>{{ fusion_date or '-' }}</em>
-  </a>
-  <a class="metric-tile accent-slate" href="{{ app_path('/pipeline') }}">
-    <span>파이프라인</span><strong>{{ steps|length }}</strong><em>최근 로그</em>
-  </a>
-</section>
-
-<section class="dashboard-grid">
-  <section class="panel span-7">
-    <div class="panel-head">
-      <h2>전략별 선별 분포</h2>
-      <a href="{{ app_path('/screening') }}">전체 보기</a>
     </div>
-    <div class="bar-list">
-      {% for row in strategy_counts %}
-      <a class="bar-row" href="{{ app_path('/screening') }}?strategy={{ row.strategy }}">
-        <span class="bar-label">{{ row.strategy | strategy_ko }}</span>
-        <span class="bar-track"><span class="bar-fill" style="width: {{ row.width }}%"></span></span>
-        <strong>{{ row.count }}</strong>
+    <div class="filter-group">
+      <h3>정렬</h3>
+      {% for key, label in [('market','대표순'), ('fusion','융합 점수'), ('screening','스크리닝 점수'), ('change','등락률')] %}
+      <a class="filter-link {% if selected_sort == key %}active{% endif %}"
+         href="{{ app_path('/') }}?market={{ selected_market }}&sort={{ key }}">{{ label }}</a>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <div class="dashboard-main">
+    <section class="metric-grid">
+      <a class="metric-tile accent-blue" href="{{ app_path('/screening') }}">
+        <span>스크리닝</span><strong>{{ screening_count }}</strong><em>{{ screen_date or '-' }}</em>
       </a>
-      {% endfor %}
-    </div>
-  </section>
+      <a class="metric-tile accent-green" href="{{ app_path('/fusion') }}">
+        <span>융합 시그널</span><strong>{{ fusion_count }}</strong><em>{{ fusion_date or '-' }}</em>
+      </a>
+      <a class="metric-tile accent-slate" href="{{ app_path('/pipeline') }}">
+        <span>파이프라인</span><strong>{{ steps|length }}</strong><em>최근 로그</em>
+      </a>
+    </section>
 
-  <section class="panel span-5">
-    <div class="panel-head">
-      <h2>융합 랭킹</h2>
-      <a href="{{ app_path('/fusion') }}">상세</a>
-    </div>
-    <div class="rank-list">
-      {% for row in fusion_top %}
-      <div class="rank-row">
-        <span>{{ loop.index }}</span>
-        <strong>{{ row.stock_code }}</strong>
-        <em>{{ row.recommendation | recommendation_ko }}</em>
-        <div class="score-line"><span style="width: {{ row.width }}%"></span></div>
-        <b>{{ "%.2f"|format(row.fusion_score) }}</b>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="panel span-6">
-    <div class="panel-head">
-      <h2>매크로</h2>
-    </div>
-    <div class="macro-grid">
-      {% for row in macro_rows %}
-      <div class="macro-item">
-        <span>{{ row.symbol }}</span>
-        <strong>{{ "%.2f"|format(row.close) }}</strong>
-        <em class="{% if row.change_pct >= 0 %}pos{% else %}neg{% endif %}">
-          {{ "%+.2f"|format(row.change_pct) }}%
-        </em>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="panel span-6">
-    <div class="panel-head">
-      <h2>최근 파이프라인</h2>
-      <a href="{{ app_path('/pipeline') }}">로그</a>
-    </div>
-    <div class="step-list">
-      {% for row in steps %}
-      <div class="step-row">
-        <span class="status-dot status-{{ row.status }}"></span>
-        <strong>{{ row.stage }}</strong>
-        <em>{{ row.status }}</em>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="panel span-12">
-    <div class="panel-head">
-      <h2>대표 종목 20</h2>
-      <span class="panel-note">KOSPI 10 / KOSDAQ 10</span>
-    </div>
-    <div class="market-panels">
-      {% for market in ['KOSPI', 'KOSDAQ'] %}
-      {% if selected_market == 'ALL' or selected_market == market %}
-      <div class="market-panel">
-        <div class="market-panel-head">
-          <strong>{{ market }}</strong>
-          <span>{{ rep_rows.get(market, [])|length }}개</span>
+    <section class="dashboard-grid">
+      <section class="panel span-7">
+        <div class="panel-head">
+          <h2>전략별 선별 분포</h2>
+          <a href="{{ app_path('/screening') }}">전체 보기</a>
         </div>
-        <div class="rep-list">
-          {% for row in rep_rows.get(market, []) %}
-          <div class="rep-row">
-            <span class="rep-rank">{{ loop.index }}</span>
-            <strong>{{ row.corp_name }}</strong>
-            <em>{{ row.stock_code }}</em>
-            <span class="rep-close">{{ row.close if row.close is not none else '-' }}</span>
-            <span class="rep-change {% if row.change_pct is not none and row.change_pct >= 0 %}pos{% else %}neg{% endif %}">
-              {% if row.change_pct is not none %}
-                {{ "%+.2f"|format(row.change_pct) }}%
-              {% else %}
-                -
-              {% endif %}
-            </span>
-            <span class="rep-meta">
-              {%- if row.recommendation %}{{ row.recommendation | recommendation_ko }}
-              {%- elif row.screen_strategy %}{{ row.screen_strategy | strategy_ko }}
-              {%- else %}-{% endif %}
-            </span>
+        <div class="bar-list">
+          {% for row in strategy_counts %}
+          <a class="bar-row" href="{{ app_path('/screening') }}?strategy={{ row.strategy }}">
+            <span class="bar-label">{{ row.strategy | strategy_ko }}</span>
+            <span class="bar-track"><span class="bar-fill" style="width: {{ row.width }}%"></span></span>
+            <strong>{{ row.count }}</strong>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel span-5">
+        <div class="panel-head">
+          <h2>융합 랭킹</h2>
+          <a href="{{ app_path('/fusion') }}">상세</a>
+        </div>
+        <div class="rank-list">
+          {% for row in fusion_top %}
+          <div class="rank-row">
+            <span>{{ loop.index }}</span>
+            <strong>{{ row.stock_code }}</strong>
+            <em>{{ row.recommendation | recommendation_ko }}</em>
+            <div class="score-line"><span style="width: {{ row.width }}%"></span></div>
+            <b>{{ "%.2f"|format(row.fusion_score) }}</b>
           </div>
           {% endfor %}
-          {% if not rep_rows.get(market) %}
-          <p class="empty-state">대표 종목 데이터가 없습니다.</p>
-          {% endif %}
         </div>
-      </div>
-      {% endif %}
-      {% endfor %}
-    </div>
-  </section>
-</section>
+      </section>
+
+      <section class="panel span-6">
+        <div class="panel-head">
+          <h2>매크로</h2>
+        </div>
+        <div class="macro-grid">
+          {% for row in macro_rows %}
+          <div class="macro-item">
+            <span>{{ row.symbol }}</span>
+            <strong>{{ "%.2f"|format(row.close) }}</strong>
+            <em class="{% if row.change_pct >= 0 %}pos{% else %}neg{% endif %}">
+              {{ "%+.2f"|format(row.change_pct) }}%
+            </em>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel span-6">
+        <div class="panel-head">
+          <h2>최근 파이프라인</h2>
+          <a href="{{ app_path('/pipeline') }}">로그</a>
+        </div>
+        <div class="step-list">
+          {% for row in steps %}
+          <div class="step-row">
+            <span class="status-dot status-{{ row.status }}"></span>
+            <strong>{{ row.stage }}</strong>
+            <em>{{ row.status }}</em>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel span-12">
+        <div class="panel-head">
+          <h2>대표 종목 20</h2>
+          <span class="panel-note">KOSPI 10 / KOSDAQ 10</span>
+        </div>
+        <div class="market-panels">
+          {% for market in ['KOSPI', 'KOSDAQ'] %}
+          {% if selected_market == 'ALL' or selected_market == market %}
+          <div class="market-panel">
+            <div class="market-panel-head">
+              <strong>{{ market }}</strong>
+              <span>{{ rep_rows.get(market, [])|length }}개</span>
+            </div>
+            <div class="rep-list">
+              {% for row in rep_rows.get(market, []) %}
+              <div class="rep-row">
+                <span class="rep-rank">{{ loop.index }}</span>
+                <strong>{{ row.corp_name }}</strong>
+                <em>{{ row.stock_code }}</em>
+                <span class="rep-close">{{ row.close if row.close is not none else '-' }}</span>
+                <span class="rep-change {% if row.change_pct is not none and row.change_pct >= 0 %}pos{% else %}neg{% endif %}">
+                  {% if row.change_pct is not none %}
+                    {{ "%+.2f"|format(row.change_pct) }}%
+                  {% else %}
+                    -
+                  {% endif %}
+                </span>
+                <span class="rep-meta">
+                  {%- if row.recommendation %}{{ row.recommendation | recommendation_ko }}
+                  {%- elif row.screen_strategy %}{{ row.screen_strategy | strategy_ko }}
+                  {%- else %}-{% endif %}
+                </span>
+              </div>
+              {% endfor %}
+              {% if not rep_rows.get(market) %}
+              <p class="empty-state">대표 종목 데이터가 없습니다.</p>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+    </section>
+  </div>
+</div>
 {% endblock %}
