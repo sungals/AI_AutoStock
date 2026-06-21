@@ -1,4 +1,5 @@
 """포트폴리오 DB 헬퍼 — 가상/Mock 라이브 포트폴리오 최소 운영 기능."""
+import json
 from typing import Dict, Optional
 
 
@@ -128,3 +129,50 @@ def get_live_portfolio(conn, portfolio_id: int):
     if not row:
         raise ValueError('portfolio not found')
     return row
+
+
+def record_live_trade(conn, portfolio_id: int, stock_code: str, trade_date: str,
+                      trade_type: str, quantity: int, price: float,
+                      order_id: Optional[str] = None,
+                      exit_reason: Optional[str] = None,
+                      metadata: Optional[Dict] = None) -> int:
+    """라이브/모의 체결 기록. trade_type: 'buy'|'sell'."""
+    amount = quantity * price
+    conn.execute(
+        """INSERT INTO live_trades
+           (portfolio_id, stock_code, trade_date, trade_type, quantity, price,
+            amount, exit_reason, order_id, metadata)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (portfolio_id, stock_code, trade_date, trade_type, quantity, price,
+         amount, exit_reason, order_id, json.dumps(metadata or {}, ensure_ascii=False)))
+    return int(conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id'])
+
+
+def get_live_holdings(conn, portfolio_id: int) -> Dict[str, int]:
+    """live_trades 누적(매수-매도)으로 보유 수량 산출. 0주는 제외."""
+    rows = conn.execute(
+        """SELECT stock_code, trade_type, SUM(quantity) AS q
+           FROM live_trades WHERE portfolio_id=? GROUP BY stock_code, trade_type""",
+        (portfolio_id,)).fetchall()
+    holdings = {}  # type: Dict[str, int]
+    for r in rows:
+        sign = 1 if r['trade_type'] == 'buy' else -1
+        holdings[r['stock_code']] = holdings.get(r['stock_code'], 0) + sign * int(r['q'])
+    return {k: v for k, v in holdings.items() if v != 0}
+
+
+def update_live_cash(conn, portfolio_id: int, delta: float) -> None:
+    """현금 증감(매수 -, 매도 +)."""
+    conn.execute(
+        "UPDATE live_portfolios SET cash = cash + ? WHERE id=?",
+        (delta, portfolio_id))
+
+
+def has_live_buy(conn, portfolio_id: int, stock_code: str, trade_date: str) -> bool:
+    """멱등성: 해당 종목을 그날 이미 매수 기록했는지."""
+    row = conn.execute(
+        """SELECT 1 FROM live_trades
+           WHERE portfolio_id=? AND stock_code=? AND trade_date=? AND trade_type='buy'
+           LIMIT 1""",
+        (portfolio_id, stock_code, trade_date)).fetchone()
+    return row is not None

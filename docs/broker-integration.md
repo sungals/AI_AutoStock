@@ -71,3 +71,33 @@ NH로 전환할 시점에 위 항목을 확인해 `NHBroker`를 구현한다. NH
 
 > 참고: 위 NH API 특성은 일반적 경향에 기반한 것으로, **NH투자증권 공식 OpenAPI 최신 문서로
 > 반드시 재확인**해야 한다(REST 제공 여부·모의 환경이 바뀌었을 수 있음).
+
+## 페이퍼 트레이딩 루프 — 구현됨 (스캐폴딩)
+
+시그널(예: value 스크리닝 상위)을 **모의 브로커로 매수 집행하고 live_trades에 기록**한다.
+
+| 모듈 | 역할 |
+|------|------|
+| `broker/memory.py` | `MemoryBroker` — 네트워크 없는 인메모리 브로커(결정적 테스트·로컬 검증) |
+| `db_portfolio.py` | `record_live_trade`, `get_live_holdings`, `update_live_cash`, `has_live_buy` |
+| `paper_trader.py` | `run_paper_session(picks)`, `reconcile()`, `positions_from_kis_balance()` |
+
+**안전·규칙**:
+- **모의 포트폴리오 + 모의 브로커만** 허용(live/prod면 거부).
+- **멱등성**: 같은 날 같은 종목 재매수 안 함. 이미 보유 종목 스킵.
+- **사이징**: 종목당 `max_position_size`(기본 20%) × 초기자본, 현금 한도 내.
+- **정합성**: `reconcile()`로 DB 보유 vs 브로커 잔고 비교(불일치 탐지).
+
+E2E 확인: 실 value 상위 5종목 → 모의 매수 5건, 현금 차감, **DB↔브로커 일치(matched)**.
+테스트 7건(인메모리 브로커, 오프라인). **전체 132 passed.**
+
+```python
+import db_portfolio, paper_trader
+from broker.memory import MemoryBroker   # 또는 broker.get_broker()로 KIS mock
+pid = db_portfolio.create_live_portfolio(conn, 'paper', 10_000_000, mode='mock')
+paper_trader.run_paper_session(conn, pid, ['000270','005930'], broker=MemoryBroker(prices={...}))
+paper_trader.reconcile(conn, pid, broker)
+```
+
+**남은 작업**: 매도/손절/청산·리밸런싱, 실시간 체결통보(WebSocket) 기반 상태추적, 일일손실
+한도·킬스위치 집행, KIS mock 라이브 검증(키 투입), 성과/추적오차 기록, EOD 파이프라인 연결.
