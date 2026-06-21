@@ -46,6 +46,22 @@ DART_REPRT_KEYWORD = {
 }
 
 # ============================================================
+# 증권사 연동 (브로커) — 자동매매. 안전 기본값: 모의투자(mock)
+# ============================================================
+
+# 브로커 선택 ('kis'=한국투자증권, 추후 'nh'=NH투자증권 나무)
+BROKER_PROVIDER = os.environ.get('BROKER_PROVIDER', 'kis')
+
+# 한국투자증권(KIS) OpenAPI
+KIS_APP_KEY = os.environ.get('KOREAINVESTMENT_APP_ID', '')
+KIS_APP_SECRET = os.environ.get('KOREAINVESTMENT_SECRET', '')
+KIS_ACCOUNT = os.environ.get('KOREAINVESTMENT_ACCOUNT', '')   # 'XXXXXXXX-XX'
+# 'mock'=모의투자(안전, 기본) / 'prod'=실계좌(실제 자산 영향)
+KIS_MODE = os.environ.get('KOREAINVESTMENT_MODE', 'mock')
+KIS_MOCK_URL = 'https://openapivts.koreainvestment.com:29443'
+KIS_PROD_URL = 'https://openapi.koreainvestment.com:9443'
+
+# ============================================================
 # 백테스트 신뢰성 레이어 설정 (docs/backtest-reliability/00-스펙-설계.md §6)
 # ============================================================
 
