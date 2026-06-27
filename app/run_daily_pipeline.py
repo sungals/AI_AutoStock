@@ -194,6 +194,7 @@ def stage_paper_trade(db_path: Optional[str], ctx: Dict) -> str:
     import db_portfolio
     import exit_manager
     import paper_trader
+    import performance
 
     screen_date = ctx.get('screen_date') or _latest_trade_date(db_path)
     if not screen_date:
@@ -211,10 +212,15 @@ def stage_paper_trade(db_path: Optional[str], ctx: Dict) -> str:
         ex = exit_manager.run_exits(conn, pid, broker, trade_date=screen_date)
         en = paper_trader.run_paper_session(
             conn, pid, picks, broker=broker, trade_date=screen_date, reason=strategy)
-        if en.get('halted'):
-            return 'exits=%d (sold) | entries HALTED: %s' % (ex['sold'], en['reason'])
-        return 'portfolio=%d strat=%s | 청산 %d / 진입 %d (skip %d, fail %d)' % (
-            pid, strategy, ex['sold'], en['submitted'], en['skipped'], en['failed'])
+        # 매매 후 일별 성과 스냅샷(평가액·수익률·벤치마크)
+        snap = performance.snapshot(conn, pid, screen_date, broker.get_price)
+        summary = performance.performance_summary(conn, pid)
+        halted = ' | entries HALTED: %s' % en['reason'] if en.get('halted') else ''
+        return ('portfolio=%d strat=%s | 청산 %d / 진입 %d | 평가 %.0f 누적 %.2f%% '
+                'TE %s%s' % (
+                    pid, strategy, ex['sold'], en.get('submitted', 0),
+                    snap['portfolio_value'], (summary.get('cum_return') or 0) * 100,
+                    summary.get('tracking_error'), halted))
 
 
 def stage_fusion(db_path: Optional[str], ctx: Dict) -> str:

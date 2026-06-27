@@ -330,6 +330,20 @@ CREATE TABLE IF NOT EXISTS risk_daily (
     start_value  REAL NOT NULL,
     PRIMARY KEY (portfolio_id, trade_date)
 );
+
+-- 라이브/모의 포트폴리오 일별 성과 + 벤치마크(추적오차 계산용).
+CREATE TABLE IF NOT EXISTS live_performance (
+    portfolio_id         INTEGER NOT NULL,
+    perf_date            TEXT NOT NULL,
+    portfolio_value      REAL NOT NULL,
+    daily_return         REAL,
+    cum_return           REAL,
+    benchmark_value      REAL,
+    benchmark_daily_return REAL,
+    active_daily_return  REAL,
+    created_at           TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (portfolio_id, perf_date)
+);
 """
 
 
